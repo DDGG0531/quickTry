@@ -1,32 +1,70 @@
 import React, { useState, useRef, useCallback } from 'react'
 import useBookSearch from '../libs/useBookSearch'
 import InfiniteScroll from 'react-infinite-scroll-component'
+import { useInfiniteQuery } from 'react-query'
+import axios from 'axios'
 
 export default function MyInfiniteScroll() {
-  const [query, setQuery] = useState('')
-  const [pageNumber, setPageNumber] = useState(1)
-  const {
-    books: items,
-    hasMore,
-    loading,
-    error
-  } = useBookSearch(query, pageNumber)
+  // const [query, setQuery] = useState('')
+  // const [pageNumber, setPageNumber] = useState(1)
+  // const {
+  //   books: items,
+  //   hasMore,
+  //   loading,
+  //   error
+  // } = useBookSearch(query, pageNumber)
 
-  function handleSearch(e) {
-    setQuery(e.target.value)
-    setPageNumber(1)
+  // function handleSearch(e) {
+  //   setQuery(e.target.value)
+  //   setPageNumber(1)
+  // }
+
+  const fetchPage = async pageParam => {
+    const res = await axios({
+      method: 'GET',
+      url: 'http://openlibrary.org/search.json',
+      params: { q: 'abc', page: pageParam }
+    })
+
+    return {
+      data: res.data.docs.map(b => b.title),
+      hasMore: res.data.docs.length > 0
+    }
   }
+
+  const {
+    data,
+    fetchNextPage,
+    fetchPreviousPage,
+    hasNextPage,
+    hasPreviousPage,
+    isFetchingNextPage
+  } = useInfiniteQuery(['books'], ({ pageParam = 1 }) => fetchPage(pageParam), {
+    getNextPageParam: (_lastPage, pages) => {
+      console.log('_lastPage', _lastPage)
+      if (_lastPage.hasMore) {
+        return pages.length + 1
+      } else {
+        return undefined
+      }
+    }
+  })
+
+  const items =
+    data?.pages
+      ?.reduce((acc, current) => {
+        return [...acc, current.data]
+      }, [])
+      .flat() || []
 
   return (
     <>
-      <input type="text" value={query} onChange={handleSearch}></input>
+      {/* <input type="text" value={query} onChange={handleSearch}></input> */}
 
       <InfiniteScroll
         dataLength={items.length} //This is important field to render the next data
-        next={() => {
-          setPageNumber(prev => prev + 1)
-        }}
-        hasMore={hasMore}
+        next={fetchNextPage}
+        hasMore={hasNextPage}
         loader={<h4>Loading...</h4>}
         endMessage={
           <p style={{ textAlign: 'center' }}>
